@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, get_jwt_identity, get_jwt, jwt_required
 
 
@@ -157,7 +158,7 @@ def add_user():
                 if user:
                     return jsonify({"error": "User already exists."})
                 
-                new_user = User(username=data["username"], email=data["email"], password=data['password'])
+                new_user = User(username=data["username"], email=data["email"], password=generate_password_hash(data['password']))
 
                 db.session.add(new_user)
             except Exception as e:
@@ -177,7 +178,7 @@ def login():
 
         try:
             if user:
-                if data["password"] == user.password:
+                if check_password_hash(user.password, data["password"]):
                     token = create_access_token(identity=str(user.id))
 
                     return jsonify({"token": token}), 200

@@ -1,10 +1,10 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, get_jwt_identity, get_jwt, jwt_required
 
 
 from .models import db, Blog, Tag, User, Comment, Reply, Like, InvalidToken
-from .helper import get_blog_likes, serialize_replies, get_comment_likes, get_reply_likes, cache, get_user, rate_limt
+from .helper import get_blog_likes, serialize_replies, get_comment_likes, get_reply_likes, cache, get_user, rate_limt, validate_name
 
 bp = Blueprint("bp", __name__)
 
@@ -153,7 +153,7 @@ def add_user():
         data = request.get_json()
         user = User.query.filter_by(email=data["email"]).first()
 
-        if data:
+        if data is not None:
             try:
                 if user:
                     return jsonify({"error": "User already exists."})
@@ -167,6 +167,8 @@ def add_user():
             else:
                 db.session.commit()
                 return jsonify({"Message": "User added successfully."}), 201
+            
+        return jsonify({"error": "Username, email and password field is required."}), 400
 
 
 @bp.route("/login", methods=["POST"])
@@ -770,6 +772,67 @@ def profile():
         }), 200
     
     return jsonify({"error": "No user found"}), 200
+
+
+@bp.route("/password-update", methods=["PATCH"])
+@jwt_required()
+@rate_limt(MAX_REQUEST=2, BANNED_TIME=43800)
+def change_password():
+    if request.method == 'PATCH':
+        user_id = get_jwt_identity()
+        data = request.get_json()
+
+        if user_id is not None:
+            user = get_user(int(user_id))
+
+            if not user:
+                return jsonify({"error": "No user found."}), 200
+            
+            if data is None or not data:
+                return jsonify({"error": "Old password and new password field is required."}), 200
+           
+            if check_password_hash(user.password, data["old password"]):
+                try:
+                    user.password = generate_password_hash(data['new password'])
+                except Exception as e:
+                    db.session.rollback()
+                    return jsonify({"error": str(e)}), 500
+                else:
+                    db.session.commit()
+                    return jsonify({"Message": "Password changed successfully"}), 201
+            
+            return jsonify({"error": "Incorrect password."}), 200
+        
+        abort(401)
+
+
+@bp.route("/username-update", methods=["PATCH"])
+@jwt_required()
+def change_username():
+    if request.method == "PATCH":
+        data = request.get_json()
+
+        user_id = get_jwt_identity()
+
+        if user_id is not None:
+            user = get_user(int(user_id))
+
+            if not user:
+                return jsonify({"error": "User not found."})
+            
+            if data is None or not data:
+                return jsonify({"error": "Username field is required"}), 200
+            
+            try:
+                user.username = data['username']
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({"error": str(e)}), 500
+            else:
+                db.session.commit()
+                return jsonify({"Message": "Username changed successfully."}), 201
+            
+        abort(401)
 
 
 

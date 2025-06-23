@@ -157,3 +157,20 @@ def is_token_in_blocklist(data, decrypt):
 
     return InvalidToken.is_jti_valid(jti)
 
+def validate_name(x):
+    """
+    This function is meant to screen invalid inputs from data sent by the clients.
+    """
+    numbers = "1,2,3,4,5,6,7,8,9,0"
+    symbols = "!@#$%^&*()}{[]?/>.<,`~|"";:=+_"
+
+    if x.isdigit():
+        return jsonify({"error": "Name cannot be numbers. Please input a valid name."}), 200
+    elif len(x) <=2:
+        return jsonify({"error": "Name too short or name cannot be empty."}), 200
+    elif any(num in numbers for num in x):
+        return jsonify({"error": "Numbers should not be in name. Please input a valid name."}), 200
+    elif any(sym in symbols for sym in x):
+        return jsonify({"error": "Name has no special characters. Please input a valid name."}), 200
+    else:
+        return x

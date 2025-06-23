@@ -180,6 +180,9 @@ def login():
 
         try:
             if user:
+                if data is None or not data:
+                    return jsonify({"error": "username and password fields cannot be empty."}), 400
+                
                 if check_password_hash(user.password, data["password"]):
                     token = create_access_token(identity=str(user.id))
 

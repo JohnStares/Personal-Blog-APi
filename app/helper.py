@@ -6,7 +6,7 @@ from functools import wraps
 from datetime import datetime, timedelta, timezone
 
 
-from .models import Like, User, InvalidToken
+from .models import Like, User, InvalidToken, Follow
 from . import jwt
 
 
@@ -174,3 +174,14 @@ def validate_name(x):
         return jsonify({"error": "Name has no special characters. Please input a valid name."}), 200
     else:
         return x
+
+
+def is_following(follower: int, following: int) -> int:
+    '''This finction checks if a user is already following another user. 
+       if so it ensures there is no duplicate and it also ensures users cannot follow themseleves
+    '''
+    if follower == following:
+        return jsonify({"error": "You cannot follow yourself"}), 200
+    
+    if Follow.query.filter_by(follower_user_id=follower, followed_user_id=following).first():
+        return jsonify({"error": "You are already following this user."}), 200

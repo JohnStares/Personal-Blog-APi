@@ -3,8 +3,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, get_jwt_identity, get_jwt, jwt_required
 
 
-from .models import db, Blog, Tag, User, Comment, Reply, Like, InvalidToken
-from .helper import get_blog_likes, serialize_replies, get_comment_likes, get_reply_likes, cache, get_user, rate_limt, validate_name
+from .models import db, Blog, Tag, User, Comment, Reply, Like, InvalidToken, Follow
+from .helper import get_blog_likes, serialize_replies, get_comment_likes, get_reply_likes, cache, get_user, rate_limt, validate_name, user_id_int, is_following
 
 bp = Blueprint("bp", __name__)
 
@@ -84,14 +84,17 @@ def view_blogs():
             "Category": blog.category,
             "Blog Likes": get_blog_likes(blog),
             "Author": blog.author,
+            "Author Id": blog.user_id,
             "Interactions": [{
                 "id": comment.id,
                 "Comment": comment.content,
+                "comment user id": comment.users.id,
                 "Comment user's name": comment.users.username,
                 "Comment Likes": get_comment_likes(comment),
                 "ReplyContent": [{
                     "id": reply.id,
                     "Reply": reply.replies,
+                    "Reply user id": reply.users.id,
                     "Reply user's name": reply.users.username,
                     "Reply Likes": get_reply_likes(reply)
                 } for reply in comment.replies]
@@ -757,24 +760,40 @@ def search_blog():
         }), 400
     
 
+@bp.route("/user-profile/<int:id>", methods=["GET"])
 @bp.route("/user-profile", methods=["GET"])
 @jwt_required()
-def profile():
+def profile(id=None):
+    if id:
+        user = get_user(id)
+        if user is None or not user:
+            return jsonify({"error": "User not found. Maybe user has deleted their account."}), 200
+
+        try:
+            return jsonify({
+                "Username": user.username,
+                "Email": user.email
+            }), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
     
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    if user_id is None or not user_id:
+        abort(401)
 
-    if user:
+    user_id = user_id_int(user_id)
+    user = get_user(user_id)
+
+    try:
         return jsonify({
             "Username": user.username,
             "Email": user.email,
-            "Users activities": [{
-                "Blog commented": blog.blogs.title,
-                "Blog's comments replied": [reply.blogs.title for reply in user.replies]
-            } for blog in user.comments],
+            "Following": [following.following_user.username for following in user.following.all()],
+            "Followers": [follower.follower_user.username for follower in user.followers.all()]
         }), 200
-    
-    return jsonify({"error": "No user found"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 @bp.route("/password-update", methods=["PATCH"])
@@ -837,6 +856,36 @@ def change_username():
             
         abort(401)
 
+
+@bp.route("/follow/<int:id>", methods=["POST"])
+@jwt_required()
+def follow(id):
+    if request.method == "POST":
+
+        user_id = get_jwt_identity()
+        user = get_user(id)
+
+        if user_id is None:
+            abort(401)
+        if not user:
+            return jsonify({"error": "No user found. Maybe such person has deleted their account."}), 200
+        
+        user_id = user_id_int(user_id)
+        
+        is_follow = is_following(user_id, user.id)
+
+        if not is_follow:
+            try:
+                new_follower = Follow(follower_user_id=user_id, followed_user_id=user.id)
+                db.session.add(new_follower)
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({"error": str(e)}), 500
+            else:
+                db.session.commit()
+                return jsonify({"Message:": "Followed Successfully."}), 200
+            
+        return is_follow
 
 
 @bp.route('/logout', methods=["POST"])

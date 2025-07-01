@@ -10,7 +10,6 @@ tag_blog = db.Table('tag_blog',
     db.Column('tag_id', db.Integer, db.ForeignKey('tag.id'))
 )
 
-
 class Blog(db.Model):
     __tablename__ = "blog"
     id = db.Column(db.Integer, primary_key=True)
@@ -58,10 +57,21 @@ class User(db.Model):
     replies = db.relationship('Reply', backref='users', cascade='all, delete')
     blogs_posts = db.relationship("Blog", backref="users", cascade='all, delete')
 
-    def __repr__(self):
-        return "<Username - {}; Email - {};>".format(self.username, self.email)
-    
 
+    following = db.relationship("Follow",
+        foreign_keys=lambda: [Follow.follower_user_id], 
+        backref=db.backref("follower", lazy="joined"), 
+        lazy="dynamic", 
+        cascade="all, delete-orphan"
+    )
+
+
+    followers = db.relationship("Follow",
+        foreign_keys=lambda: [Follow.followed_user_id],
+        backref=db.backref("following", lazy="joined"),
+        lazy="dynamic",
+        cascade="all, delete-orphan"
+    )
 
 
 class Comment(db.Model):
@@ -116,6 +126,19 @@ class Like(db.Model):
     def __repr__(self):
         return "<Like - {}; Username - {}; Comment - {}; Blog - {};>".format(self.like, self.user_id, self.comment, self.blog_id)
     
+
+class Follow(db.Model):
+    __tablename__ = "follow"
+    id = db.Column(db.Integer, primary_key=True)
+    follow = db.Column(db.Integer, default=1, nullable=False)
+    follow_date = db.Column(db.DateTime, default=datetime.today())
+
+    follower_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    followed_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    follower_user = db.relationship("User", foreign_keys=[follower_user_id], backref="followed_links")
+    following_user = db.relationship("User", foreign_keys=[followed_user_id], backref="follower_links")
+
 
 class InvalidToken(db.Model):
     __tablename__ = "invalidtoken"

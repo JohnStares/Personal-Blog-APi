@@ -795,6 +795,43 @@ def profile(id=None):
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/search-author", methods=["GET"])
+@jwt_required()
+def search_author():
+    """The frontend developer is supposed to use the returned id from this route and redirect it to the profile route.
+    The query parameter for this route is 'a'."""
+    data = request.args.get("a")
+
+    try:
+            user_id = get_jwt_identity()
+
+            if user_id is None or not user_id:
+                abort(401)
+
+            if data is None or not data:
+                return jsonify({"error": "'a' search parameter is required."}), 400
+            
+            result = validate_name(data)
+            
+            if not result["valid"]:
+                return result["data"], result.get("code", 200)
+            
+            valid_data = result["data"]
+
+            author = User.query.filter_by(username=valid_data).first()
+
+            if author:
+                return jsonify({
+                    "id": author.id
+                }), 200
+            
+            return jsonify({"error": "No author or user with such name."}), 200
+            
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 @bp.route("/password-update", methods=["PATCH"])
 @jwt_required()

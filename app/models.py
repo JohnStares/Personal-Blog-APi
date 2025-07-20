@@ -60,17 +60,17 @@ class User(db.Model):
 
     following = db.relationship("Follow",
         foreign_keys=lambda: [Follow.follower_user_id], 
-        backref=db.backref("follower", lazy="joined"), 
+        back_populates="follower_user", 
         lazy="dynamic", 
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
 
     followers = db.relationship("Follow",
         foreign_keys=lambda: [Follow.followed_user_id],
-        backref=db.backref("following", lazy="joined"),
+        back_populates="following_user",
         lazy="dynamic",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
 
@@ -136,8 +136,8 @@ class Follow(db.Model):
     follower_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     followed_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-    follower_user = db.relationship("User", foreign_keys=[follower_user_id], backref="followed_links")
-    following_user = db.relationship("User", foreign_keys=[followed_user_id], backref="follower_links")
+    follower_user = db.relationship("User", foreign_keys=[follower_user_id], back_populates="following")
+    following_user = db.relationship("User", foreign_keys=[followed_user_id], back_populates="followers")
 
 
 class InvalidToken(db.Model):

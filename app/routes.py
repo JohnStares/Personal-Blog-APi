@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, abort
+from flask import Blueprint, jsonify, request, abort, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, get_jwt_identity, get_jwt, jwt_required
 
@@ -73,10 +73,21 @@ def post_blog():
 @bp.route("/blogs")
 @jwt_required()
 def view_blogs():
-    blogs = Blog.query.all()
+    page = request.args.get("page", 1, type=int)
+    per_page = 5
+    blogs = Blog.query.paginate(page=page, per_page=per_page, error_out=False)
 
+    next_url = url_for("bp.view_blogs", page=blogs.next_num, per_page=per_page) if blogs.has_next else None
+    prev_url = url_for("bp.view_blogs", page=blogs.prev_num, per_page=per_page) if blogs.has_prev else None
 
     return jsonify({
+        "Page": blogs.page,
+        "Per_page": per_page,
+        "Total_ Pages": blogs.pages,
+        "Has_next": blogs.has_next,
+        "Has_prev": blogs.has_prev,
+        "Next": next_url,
+        "Prev": prev_url,
         "Blogs": [{
             "id": blog.id,
             "Title": blog.title,
@@ -101,7 +112,7 @@ def view_blogs():
             } for comment in blog.comments],
             "Date Pub": blog.published_date.strftime("%Y-%m-%d"),
             "Tags": [tag.name for tag in blog.tags]
-        } for blog in blogs]
+        } for blog in blogs.items]
     }), 200
 
 
@@ -386,7 +397,7 @@ def delete_reply(reply_id: int) -> int:
 
 
 @bp.route("/view-reply")
-@rate_limt(MAX_REQUEST=3)
+@jwt_required()
 def view_reply():
     replies = Reply.query.all()
 
@@ -400,7 +411,7 @@ def view_reply():
 
 
 @bp.route("/view-replies")
-@rate_limt(MAX_REQUEST=3)
+@jwt_required()
 def view_replies():
     comments = Comment.query.all()
 
@@ -530,26 +541,39 @@ def search_blog():
     category = request.args.get("c")
     tags = request.args.get("t")
 
-    
+    page = request.args.get("page", 1, type=int)
+    per_page = 5
+
     if title and author and category:
-        blogs = Blog.query.filter_by(title=title, category=category, author=author).all()
+        blogs = Blog.query.filter(Blog.title.ilike(title), Blog.author.ilike(author), Blog.category.ilike(category)).paginate(page=page, per_page=per_page, error_out=False)
 
         if blogs:
+            
+            next_url = url_for("bp.search_blog", page=blogs.next_num, per_page=per_page) if blogs.has_next else None
+            prev_url = url_for("bp.search_blog", page=blogs.prev_num, per_page=per_page) if blogs.has_prev else None
             try:
                 return jsonify({
+                    "Page": blogs.page,
+                    "Per_page": per_page,
+                    "Total blogs": blogs.total,
+                    "Next": next_url,
+                    "Prev": prev_url,
                     "Blog": [{
                         "Full Query": f"{title} | {category} | {author}",
                         "results": [{
+                            "Id": blog.id,
                             "Title": blog.title,
                             "Category": blog.category,
                             "Content": blog.content,
                             "Blog Likes": get_blog_likes(blog),
                             "Author": blog.author,
                             "Interactions": [{
+                                "Comment Id": comment.id,
                                 "Comment": comment.content,
                                 "Comment username": comment.users.username,
                                 "Comment Likes": get_comment_likes(comment),
                                 "Replycontent": [{
+                                    "Reply Id": reply.id,
                                     "Reply": reply.replies,
                                     "Reply username": reply.users.username,
                                     "Reply Likes": get_reply_likes(reply),
@@ -557,7 +581,7 @@ def search_blog():
                             }for comment in blog.comments],
                             "Tags": [tag.name for tag in blog.tags],
                             "Published date": blog.published_date
-                        } for blog in blogs],
+                        } for blog in blogs.items],
                     "Message": f"These are all the results pertaining to your search query '{title} || {category} || {author}'."
                     }]
                 }), 200
@@ -568,24 +592,34 @@ def search_blog():
         
 
     elif title:
-        blogs = Blog.query.filter_by(title=title).all()
+        blogs = Blog.query.filter(Blog.title.ilike(f"%{title}%")).paginate(page=page, per_page=per_page, error_out=False)
+
+        next_url = url_for("bp.search_blog", page=blogs.next_num, per_page=per_page) if blogs.has_next else None
+        prev_url = url_for("bp.search_blog", page=blogs.prev_num, per_page=per_page) if blogs.has_prev else None
 
         if blogs:
             try:
                 return jsonify({
+                    "Page": blogs.page,
+                    "Per_page": per_page,
+                    "Next": next_url,
+                    "Prev": prev_url,
                     "Blog": [{
                         "q": title,
                         "results": [{
+                            "Id": blog.id,
                             "Title": blog.title,
                             "Category": blog.category,
                             "Content": blog.content,
                             "Blog Likes": get_blog_likes(blog),
                             "Author": blog.author,
                             "Interactions": [{
+                                "Comment Id": comment.id,
                                 "Comment": comment.content,
                                 "Comment username": comment.users.username,
                                 "Comment Likes": get_comment_likes(comment),
                                 "Replycontent": [{
+                                    "Reply Id": reply.id,
                                     "Reply": reply.replies,
                                     "Reply username": reply.users.username,
                                     "Reply Likes": get_reply_likes(reply),
@@ -593,7 +627,7 @@ def search_blog():
                             }for comment in blog.comments],
                             "Tags": [tag.name for tag in blog.tags],
                             "Published date": blog.published_date
-                        } for blog in blogs],
+                        } for blog in blogs.items],
                     "Message": f"These are all the results pertaining to your search query '{title}'."
                     }]
                     
@@ -604,14 +638,21 @@ def search_blog():
             return jsonify({"Message": "No content with such title"}), 200
     
     elif tags:
-       tag = Tag.query.filter_by(name=tags).first()
+       tag = Tag.query.filter(Tag.name.ilike(f"%{tags}%")).paginate(page=page, per_page=per_page, error_out=False)
+
+       next_url = url_for("bp.search_blog", page=blogs.next_num, per_page=per_page) if tag.has_next else None
+       prev_url = url_for("bp.search_blog", page=blogs.prev_num, per_page=per_page) if tag.has_prev else None
        
        if tag:
             try:
                 return jsonify({
+                    "Page": tag.page,
+                    "Next": next_url,
+                    "Prev": prev_url,
                     "Blog": [{
                         "t": tags,
                         "result": [{
+                            "Id": blog.id,
                             "Title": blog.title,
                             "Category": blog.category,
                             "Content": blog.content,
@@ -619,17 +660,19 @@ def search_blog():
                             "Author": blog.author,
                             "Published date": blog.published_date,
                             "Interactions": [{
+                                "Comment Id": comment.id,
                                 "Comment": comment.content,
                                 "Comment username": comment.users.username,
                                 "Comment Likes": get_comment_likes(comment),
                                 "Replycontent": [{
+                                    "Reply Id": reply.id,
                                     "Reply": reply.replies,
                                     "Reply username": reply.users.username,
                                     "Reply Likes": get_reply_likes(reply),
                                 } for reply in comment.replies]
                             }for comment in blog.comments],
                             "Tag": [tag.name for tag in blog.tags],
-                        } for blog in tag.blogs],
+                        } for t in tag.items for blog in t.blogs],
                     "Message": f"These are all the results pertaining to your search query '{tags}'."
                     }]
                 }), 200
@@ -639,24 +682,35 @@ def search_blog():
             return jsonify({"Message": "No content with such tag"}), 200
         
     elif category:
-        blogs = Blog.query.filter_by(category=category).all()
+        blogs = Blog.query.filter(Blog.category.ilike(f"%{category}%")).paginate(page=page, per_page=per_page, error_out=False)
+
+        next_url = url_for("bp.search_blog", page=blogs.next_num, per_page=per_page) if blogs.has_next else None
+        prev_url = url_for("bp.search_blog", page=blogs.prev_num, per_page=per_page) if blogs.has_prev else None
 
         if blogs:
             try:
                 return jsonify({
+                    "Page": blogs.page,
+                    "Per_page": per_page,
+                    "Total content": blogs.total,
+                    "Next": next_url,
+                    "Prev": prev_url,
                     "Blog": [{
                         "c": category,
                         "results": [{
+                            "Id": blog.id,
                             "Title": blog.title,
                             "Category": blog.category,
                             "Content": blog.content,
                             "Blog Likes": get_blog_likes(blog),
                             "Author": blog.author,
                             "Interactions": [{
+                                "Comment Id": comment.id,
                                 "Comment": comment.content,
                                 "Comment username": comment.users.username,
                                 "Comment Likes": get_comment_likes(comment),
                                 "Replycontent": [{
+                                    "Reply Id": reply.id,
                                     "Reply": reply.replies,
                                     "Reply username": reply.users.username,
                                     "Reply Likes": get_reply_likes(reply),
@@ -664,7 +718,7 @@ def search_blog():
                             }for comment in blog.comments],
                             "Tags": [tag.name for tag in blog.tags],
                             "Published date": blog.published_date
-                        } for blog in blogs],
+                        } for blog in blogs.items],
                     "Message": f"These are all the results pertaining to your search query '{category}'."
                     }]
                 }), 200
@@ -683,16 +737,19 @@ def search_blog():
                     "Blog": [{
                         "a": author,
                         "results": [{
+                            "Id": blog.id,
                             "Title": blog.title,
                             "Category": blog.category,
                             "Content": blog.content,
                             "Blog Likes": get_blog_likes(blog),
                             "Author": blog.author,
                             "Interactions": [{
+                                "Comment Id": comment.id,
                                 "Comment": comment.content,
                                 "Comment username": comment.users.username,
                                 "Comment Likes": get_comment_likes(comment),
                                 "Replycontent": [{
+                                    "Reply Id": reply.id,
                                     "Reply": reply.replies,
                                     "Reply username": reply.users.username,
                                     "Reply Likes": get_reply_likes(reply),
@@ -710,22 +767,31 @@ def search_blog():
             return jsonify({"Message": "No content by such author"}), 200
         
     elif date:
-        blogs = Blog.query.all()
+        blogs = Blog.query.paginate(page=page, per_page=per_page, error_out=False)
+
+        next_url = url_for("bp.search_blog", page=blogs.next_num, per_page=per_page) if blogs.has_next else None
+        prev_url = url_for("bp.search_blog", page=blogs.prev_num, per_page=per_page) if blogs.has_prev else None
 
         try:
             result = [{
+                "Page": blogs.page,
+                "Next": next_url,
+                "Prev": prev_url,
                 "p": date,
                 "results": [{
+                    "Id": blog.id,
                     "Title": blog.title,
                     "Category": blog.category,
                     "Content": blog.content,
                     "Blog Likes": get_blog_likes(blog),
                     "Author": blog.author,
                     "Interactions": [{
+                        "Comment Id": comment.id,
                         "Comment": comment.content,
                         "Comment username": comment.users.username,
                         "Comment Likes": get_comment_likes(comment),
                         "Replycontent": [{
+                            "Reply Id": reply.id,
                             "Reply": reply.replies,
                             "Reply username": reply.users.username,
                             "Reply Likes": get_reply_likes(reply),
@@ -733,7 +799,7 @@ def search_blog():
                     }for comment in blog.comments],
                     "Tags": [tag.name for tag in blog.tags],
                     "Published date": blog.published_date
-                } for blog in blogs if blog.published_date.strftime("%Y-%m-%d") == date],
+                } for blog in blogs.items if blog.published_date.strftime("%Y-%m-%d") == date],
                 "Message": f"These are all the results pertaining to your search query '{date}'."
             }]
             
@@ -772,7 +838,29 @@ def profile(id=None):
         try:
             return jsonify({
                 "Username": user.username,
-                "Email": user.email
+                "Email": user.email,
+                "Following": [following.following_user.username for following in user.following.all()],
+                "Followers": [follower.follower_user.username for follower in user.followers.all()],
+                "Blogs": [{
+                "Title": blog.title,
+                "Category": blog.category,
+                "Content": blog.content,
+                "Tag": [tag.name for tag in blog.tags],
+                "Blog Likes": get_blog_likes(blog), 
+                "Interactions": [{
+                    "Comment": comment.content,
+                    "Comment Id": comment.id,
+                    "Comment username": comment.users.username,
+                    "Comment Likes": get_comment_likes(comment),
+                    "Comment Reply": [{
+                        "Reply Id": reply.id,
+                        "Reply": reply.replies,
+                        "Reply username": reply.users.username,
+                        "Reply Likes": get_reply_likes(reply)
+                    } for reply in comment.replies],
+                } for comment in blog.comments],
+                "Blog date": blog.published_date
+            } for blog in user.blogs_posts]
             }), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -789,7 +877,28 @@ def profile(id=None):
             "Username": user.username,
             "Email": user.email,
             "Following": [following.following_user.username for following in user.following.all()],
-            "Followers": [follower.follower_user.username for follower in user.followers.all()]
+            "Followers": [follower.follower_user.username for follower in user.followers.all()],
+            "Blogs": [{
+                "Id": blog.id,
+                "Title": blog.title,
+                "Category": blog.category,
+                "Content": blog.content,
+                "Tag": [tag.name for tag in blog.tags],
+                "Blog Likes": get_blog_likes(blog), 
+                "Interactions": [{
+                    "Comment": comment.content,
+                    "Comment Id": comment.id,
+                    "Comment username": comment.users.username,
+                    "Comment Likes": get_comment_likes(comment),
+                    "Comment Reply": [{
+                        "Reply Id": reply.id,
+                        "Reply": reply.replies,
+                        "Reply username": reply.users.username,
+                        "Reply Likes": get_reply_likes(reply)
+                    } for reply in comment.replies],
+                } for comment in blog.comments],
+                "Blog date": blog.published_date
+            } for blog in user.blogs_posts]
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

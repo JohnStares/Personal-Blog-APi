@@ -198,12 +198,9 @@ def add_user():
                         unique_id = str(uuid.uuid4())[:8]
 
                         image.filename = f"{unique_id}_{image.filename}"
-                        print("1st", image.filename)
 
                     #Handles file uploads
                     img_filename = secure_filename(image.filename)
-                    print("2nd", img_filename)
-                    print("3rd", image.filename)
 
                     if img_filename:
                         file_ext = img_extension_finder(img_filename)
@@ -866,6 +863,11 @@ def search_blog():
             "Full query": "You can add q,c,a query parameter for specific query."
         }), 400
     
+@bp.route("/serve-images/<filename>")
+def serve_images(filename):
+    """This route serves images to any other routes that requires images."""
+    return send_from_directory(current_app.config["UPLOAD_PATH"], filename)
+
 
 @bp.route("/user-profile/<int:id>", methods=["GET"])
 @bp.route("/user-profile", methods=["GET"])
@@ -877,9 +879,13 @@ def profile(id=None):
             return jsonify({"error": "User not found. Maybe user has deleted their account."}), 200
 
         try:
+
+            profile_photo_url = (url_for("bp.serve_images", filename=user.profile_image, _external=True) if user.profile_image else None)
+
             return jsonify({
                 "Username": user.username,
                 "Email": user.email,
+                "Profile Photo": profile_photo_url,
                 "Following": [following.following_user.username for following in user.following.all()],
                 "Followers": [follower.follower_user.username for follower in user.followers.all()],
                 "Blogs": [{
@@ -914,9 +920,12 @@ def profile(id=None):
     user = get_user(user_id)
 
     try:
+        profile_photo_url = (url_for("bp.serve_images", filename=user.profile_image, _external=True) if user.profile_image else None)
+        
         return jsonify({
             "Username": user.username,
             "Email": user.email,
+            "Profile Photo": profile_photo_url,
             "Following": [following.following_user.username for following in user.following.all()],
             "Followers": [follower.follower_user.username for follower in user.followers.all()],
             "Blogs": [{

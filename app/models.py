@@ -25,7 +25,6 @@ class Blog(db.Model):
     title = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
     category = db.Column(db.String(50), nullable=False)
-    author = db.Column(db.String(50), default="Pythonista. John Stares")
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     published_date = db.Column(db.DateTime, default=datetime.today())
 

@@ -1,10 +1,15 @@
-from flask import Blueprint, jsonify, request, abort, url_for
+from flask import Blueprint, jsonify, request, abort, url_for, send_from_directory, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, get_jwt_identity, get_jwt, jwt_required
+from werkzeug.utils import secure_filename
+import uuid
+from sqlalchemy import event
 
+import os
+import json
 
-from .models import db, Blog, Tag, User, Comment, Reply, Like, InvalidToken, Follow
-from .helper import get_blog_likes, serialize_replies, get_comment_likes, get_reply_likes, cache, get_user, rate_limt, validate_name, user_id_int, is_following
+from .models import db, Blog, Tag, User, Comment, Reply, Like, InvalidToken, Follow, Image
+from .helper import get_blog_likes, serialize_replies, get_comment_likes, get_reply_likes, cache, get_user, rate_limt, validate_name, user_id_int, is_following, img_extension_finder, valid_image_ext
 
 bp = Blueprint("bp", __name__)
 
@@ -163,18 +168,54 @@ def delete_tag(tag_id: int) -> int:
 
 @bp.route("/register", methods=["POST"])
 def add_user():
+    """This route content type is no longer application/json rather it is multipart/form-data"""
     if request.method == "POST":
-        data = request.get_json()
-        user = User.query.filter_by(email=data["email"]).first()
+        json_data = request.form.get("data")
+        image = request.files.get("image")
 
-        if data is not None:
+        if json_data and json_data is not None:
             try:
+                data = json.loads(json_data)
+
+                username = data.get("username")
+                email = data.get("email")
+                password = data.get("password")
+
+                user = User.query.filter_by(email=email).first()
                 if user:
                     return jsonify({"error": "User already exists."})
                 
-                new_user = User(username=data["username"], email=data["email"], password=generate_password_hash(data['password']))
+                if not image:
+                    #Incase user doesn't want to use a profile picture immediately.
+                    new_user = User(username=username, email=email, password=generate_password_hash(password))
 
-                db.session.add(new_user)
+                    db.session.add(new_user)
+                else:
+                    #Checks if filepath already exists in the database
+                    if secure_filename(image.filename) in [
+                        img.profile_image for img in User.query.all()
+                    ]:
+                        unique_id = str(uuid.uuid4())[:8]
+
+                        image.filename = f"{unique_id}_{image.filename}"
+                        print("1st", image.filename)
+
+                    #Handles file uploads
+                    img_filename = secure_filename(image.filename)
+                    print("2nd", img_filename)
+                    print("3rd", image.filename)
+
+                    if img_filename:
+                        file_ext = img_extension_finder(img_filename)
+
+                        if not valid_image_ext(file_ext.lower()):
+                            return jsonify({"error": "File type not supported. Please upload a valid image"}), 400
+                        
+                        image.save(os.path.join(current_app.config["UPLOAD_PATH"], img_filename))
+
+                        new_user = User(username=username, email=email, password=generate_password_hash(password), profile_image=img_filename)
+                        db.session.add(new_user)
+                        
             except Exception as e:
                 db.session.rollback()
                 return jsonify({"error": str(e)}), 500
@@ -1003,6 +1044,77 @@ def change_username():
         abort(401)
 
 
+@bp.route("/update-profile-pic", methods=["POST"])
+@jwt_required()
+def update_profile_pic():
+    """This route content-type is not application/json; it is multipart/form-data. Frontend devops take note."""
+    image = request.files.get("image")
+
+    try:
+        user_id = user_id_int(get_jwt_identity())
+
+        if not user_id:
+            abort(401)
+
+        if not image:
+            return jsonify({"error": "An image is required. Please try uploading an image."}), 400
+        
+        #Checks if picture with the same name already exists in the database.
+        if secure_filename(image.filename) in [
+            img.profile_image for img in User.query.all()
+        ]:
+            unique_code = str(uuid.uuid4())[:8]
+            image.filename = f"{unique_code}_{image.filename}"
+
+        #Handles the updating of profile picture.
+        img_filename = secure_filename(image.filename)
+
+        img_ext = img_extension_finder(img_filename)
+
+        if not valid_image_ext(img_ext.lower()):
+            return jsonify({"error": "Invalid image format. Please provide a valid image format."}), 400
+        
+        image.save(os.path.join(current_app.config["UPLOAD_PATH"], img_filename))
+
+        user = get_user(user_id)
+
+        if not user:
+            return jsonify({"error": "User can't be found. Something went wrong."}), 500
+        
+        user.profile_image = img_filename
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    else:
+        db.session.commit()
+
+        return jsonify({"Message": "Profile picture updated successfully."}), 201
+
+
+@bp.route("delete-account", methods=["DELETE"])
+@jwt_required()
+def delete_account():
+    user_id = user_id_int(get_jwt_identity())
+
+    if not user_id:
+        abort(401)
+
+    user = get_user(user_id)
+
+    if not user:
+        return jsonify({"error": "Something wrong occurred."}), 500
+    
+    try:
+        db.session.delete(user)
+        db.session.commit()
+
+        return jsonify({"Message": "Account deleted."}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+
 @bp.route("/follow/<int:id>", methods=["POST"])
 @jwt_required()
 def follow(id):
@@ -1048,3 +1160,24 @@ def logout():
     else:
         db.session.commit()
         return jsonify({"Message": "Logged out successfully."}), 200   
+    
+
+@event.listens_for(User, "before_update")
+def delete_old_profile_image(mapper, connection, target):
+    old = User.query.get(target.id)
+
+    if old and old.profile_image != target.profile_image:
+        old_path = old.profile_image_path()
+
+        if old_path and os.path.exists(old_path):
+            os.remove(old_path)
+
+
+@event.listens_for(User, "after_delete")
+def delete_profile_picture(mapper, connection, target):
+    """Deletes the profile picture path ones the user is deleted."""
+
+    file_path = target.profile_image_path()
+
+    if file_path and os.path.exists(file_path):
+        os.remove(file_path)

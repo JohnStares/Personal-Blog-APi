@@ -7,6 +7,7 @@ from sqlalchemy import event
 
 import os
 import json
+from itertools import zip_longest
 
 from .models import db, Blog, Tag, User, Comment, Reply, Like, InvalidToken, Follow, Image
 from .helper import get_blog_likes, serialize_replies, get_comment_likes, get_reply_likes, cache, get_user, rate_limt, validate_name, user_id_int, is_following, img_extension_finder, valid_image_ext
@@ -38,33 +39,76 @@ def home():
 @bp.route("/blogs", methods=["POST"])
 @jwt_required()
 def post_blog():
+    """This route content type is also not application/json. It is multipart/form-data."""
     if request.method == "POST":
-        data = request.get_json()
+        json_data = request.form.get("data")
+        image = request.files.get("image")
 
-        if data:
+
+
+        if json_data or json_data is not None:
+            data = json.loads(json_data)
+
+            title = data.get("title")
+            content = data.get("content")
+            category = data.get("category")
+            tag = data.get("tag")
+            image_name = data.get("image_name")
+
             try:
                 user_id = get_jwt_identity()
-                if user_id is not None:
-                    username = get_user(user_id)
-                    if username:
-                        new_blog = Blog(title=data["title"], content=data['content'], category=data['category'], author=username.username, user_id=user_id)
-                        for i in range(len(data['tag'])):
-                            new_tag = Tag(name=data['tag'][i])
-                            db.session.add(new_tag)
-                            new_blog.tags.append(new_tag)
-                    
-                        db.session.add(new_blog)
+                if not user_id:
+                    abort(401)
 
-                    else:
-                        return jsonify({"error": "No user found!."})
+                username = get_user(user_id)
+                if not username:
+                    return jsonify({"error": "No user found!."}), 500
+                
+                if not image:
+                    new_blog = Blog(title=title, content=content, category=category, user_id=user_id)
+                    for i in range(len(tag)):
+                        new_tag = Tag(name=tag[i])
+                        db.session.add(new_tag)
+                        new_blog.tags.append(new_tag)
+                
+                    db.session.add(new_blog)
 
                 else:
-                    new_blog = Blog(title=data["title"], content=data['content'], category=data['category'])
-                    for i in range(len(data['tag'])):
-                        new_tag = Tag(name=data['tag'][i])
+
+                    #Check if the image name is already in the database.
+                    if secure_filename(image.filename) in [
+                        img.img_file_path for img in Image.query.all()
+                    ] or secure_filename(image.filename) in current_app.config["UPLOAD_PATH"]:
+                        unique_str = str(uuid.uuid4())[:8]
+                        image.filename = f"{unique_str}_{image.filename}"
+
+
+                    #Handles the uplaoding of the image
+                    img_filename = secure_filename(image.filename)
+
+                    img_etx = img_extension_finder(img_filename)
+
+                    if not img_etx:
+                        return jsonify({"error": "Upload a valid image."}), 400
+                    
+                    if not valid_image_ext(img_etx.lower()):
+                        return jsonify({"error": "Invalid image format. Please upload a valid image."}), 400
+                    
+                    image.save(os.path.join(current_app.config["UPLOAD_PATH"], img_filename))
+
+                    new_blog = Blog(title=title, content=content, category=category, user_id=user_id)
+
+                    for i in range(len(tag)):
+                        new_tag = Tag(name=tag[i])
                         db.session.add(new_tag)
                         new_blog.tags.append(new_tag)
                     
+
+                    
+                    new_image = Image(img_name=image_name, img_file_path=img_filename)
+                    db.session.add(new_image)
+                    new_blog.images.append(new_image)
+
                     db.session.add(new_blog)
 
             except Exception as e:
@@ -864,6 +908,7 @@ def search_blog():
         }), 400
     
 @bp.route("/serve-images/<filename>")
+@jwt_required()
 def serve_images(filename):
     """This route serves images to any other routes that requires images."""
     return send_from_directory(current_app.config["UPLOAD_PATH"], filename)
@@ -921,7 +966,7 @@ def profile(id=None):
 
     try:
         profile_photo_url = (url_for("bp.serve_images", filename=user.profile_image, _external=True) if user.profile_image else None)
-        
+
         return jsonify({
             "Username": user.username,
             "Email": user.email,

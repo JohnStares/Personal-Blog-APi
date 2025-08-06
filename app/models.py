@@ -1,6 +1,8 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask import current_app
 
 from datetime import datetime
+import os
 
 db = SQLAlchemy()
 
@@ -9,6 +11,13 @@ tag_blog = db.Table('tag_blog',
     db.Column('blog_id', db.Integer, db.ForeignKey('blog.id')),
     db.Column('tag_id', db.Integer, db.ForeignKey('tag.id'))
 )
+
+
+img_blog = db.Table("img_blog",
+    db.Column("blog_id", db.Integer, db.ForeignKey("blog.id")),
+    db.Column("img_id", db.Integer, db.ForeignKey('image.id'))
+)
+
 
 class Blog(db.Model):
     __tablename__ = "blog"
@@ -21,7 +30,7 @@ class Blog(db.Model):
     published_date = db.Column(db.DateTime, default=datetime.today())
 
 
-
+    images = db.relationship("Image", secondary=img_blog, backref="blogs", cascade="all, delete", lazy="joined")
     likes = db.relationship('Like', backref='blogs', cascade='all, delete')
     comments = db.relationship('Comment', backref='blogs', cascade='all, delete')
     tags = db.relationship('Tag', secondary=tag_blog, backref='blogs', cascade='all, delete')
@@ -50,6 +59,7 @@ class User(db.Model):
     username = db.Column(db.String(150), nullable=False)
     email = db.Column(db.String(50), nullable=False, unique=True)
     password = db.Column(db.String(500), nullable=False)
+    profile_image = db.Column(db.String(300), nullable=True)
     date_joined = db.Column(db.DateTime, default=datetime.today())
 
     likes = db.relationship('Like', backref='users', cascade='all, delete')
@@ -72,6 +82,22 @@ class User(db.Model):
         lazy="dynamic",
         cascade="all, delete-orphan",
     )
+
+    def profile_image_path(self):
+        """Returns the absoulte path to the profile image."""
+        if self.profile_image:
+            return os.path.join(current_app.config["UPLOAD_PATH"], self.profile_image)
+        
+        return None
+
+
+class Image(db.Model):
+    __tablename__ = "image"
+    id = db.Column(db.Integer, primary_key=True)
+    img_name = db.Column(db.String(100))
+    img_file_path = db.Column(db.String(100), nullable=False)
+    img_date = db.Column(db.DateTime, default=datetime.today())
+
 
 
 class Comment(db.Model):

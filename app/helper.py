@@ -1,4 +1,4 @@
-from flask import jsonify, request
+from flask import jsonify, request, current_app
 from sqlalchemy import func
 from functools import wraps
 
@@ -8,7 +8,6 @@ from datetime import datetime, timedelta, timezone
 
 from .models import Like, User, InvalidToken, Follow
 from . import jwt
-
 
 def get_blog_likes(blog):
     try:
@@ -185,3 +184,20 @@ def is_following(follower: int, following: int) -> int:
     
     if Follow.query.filter_by(follower_user_id=follower, followed_user_id=following).first():
         return jsonify({"error": "You are already following this user."}), 200
+    
+def img_extension_finder(img_name) -> str:
+    """This function grabs the name of the image and extracts only the extension. eg from cat.png to png."""
+    extension = img_name.rfind(".")
+    if extension != -1:
+        ext = img_name[extension + 1:]
+        return ext 
+    return False
+
+
+def valid_image_ext(img_name) -> bool:
+    """This function checks if the image extension is inline with what is on the server for the purpose of validation."""
+    if img_name not in current_app.config["UPLOAD_EXTENSIONS"]:
+        return False
+    else:
+        return True
+    

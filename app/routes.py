@@ -60,12 +60,12 @@ def post_blog():
                 if not user_id:
                     abort(401)
 
-                username = get_user(user_id)
-                if not username:
+                user = get_user(user_id)
+                if not user:
                     return jsonify({"error": "No user found!."}), 500
                 
                 if not image:
-                    new_blog = Blog(title=title, content=content, category=category, user_id=user_id)
+                    new_blog = Blog(title=title, content=content, category=category, author=user.username, user_id=user_id)
                     for i in range(len(tag)):
                         new_tag = Tag(name=tag[i])
                         db.session.add(new_tag)
@@ -96,7 +96,7 @@ def post_blog():
                     
                     image.save(os.path.join(current_app.config["UPLOAD_PATH"], img_filename))
 
-                    new_blog = Blog(title=title, content=content, category=category, user_id=user_id)
+                    new_blog = Blog(title=title, content=content, category=category, author=user.username, user_id=user_id)
 
                     for i in range(len(tag)):
                         new_tag = Tag(name=tag[i])
@@ -145,6 +145,9 @@ def view_blogs():
             "Blog Likes": get_blog_likes(blog),
             "Author": blog.author,
             "Author Id": blog.user_id,
+            "Images": [
+                url_for("bp.serve_images", filename=image.img_file_path, _external=True) for image in blog.images
+            ],
             "Interactions": [{
                 "id": comment.id,
                 "Comment": comment.content,

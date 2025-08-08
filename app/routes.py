@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, abort, url_for, send_from_directory, current_app
+from flask import Blueprint, jsonify, request, abort, url_for, send_from_directory, current_app, render_template
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, get_jwt_identity, get_jwt, jwt_required
 from werkzeug.utils import secure_filename
@@ -16,25 +16,7 @@ bp = Blueprint("bp", __name__)
 
 @bp.route("/")
 def home():
-    return jsonify({
-        "Message": "Welcome! Below is a guide on how to use my API.",
-        "How to use API": "API not hard to use. The endpoints will guide you on how to access contents from the API.",
-        "Endpoints": [{
-            "Base URL": "localhost:5000",
-            "To view all blogs": "/blogs",
-            "To search for a blog": [{
-                "Base on title": "/search?q=(The title here)",
-                "Base on tag": "/search?t=(You tag here)",
-                "Base on category": "/search?c=(You category here)",
-                "Base on Author": "/search?a=(Name of author)",
-                "Base on date published": "/search?p=(Date here)",
-                "For a specific search": "/search?q=(title here)&c=(category here)&a=(name of author)"
-            }]
-        }],
-        "Notice": "I will release more endpoints for developers to be able to have more functionalities with the API",
-        "Version": "v1"
-    }), 200
-
+    return render_template("index.html"), 200
 
 @bp.route("/blogs", methods=["POST"])
 @jwt_required()
@@ -1101,7 +1083,7 @@ def change_username():
         abort(401)
 
 
-@bp.route("/update-profile-pic", methods=["POST"])
+@bp.route("/update-profile-pic", methods=["PATCH"])
 @jwt_required()
 def update_profile_pic():
     """This route content-type is not application/json; it is multipart/form-data. Frontend devops take note."""

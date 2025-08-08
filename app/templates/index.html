@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Blog API Welcome Page</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container fade-in">
+        <header class="title fade-in">
+            <h1 class="con fade-in">Personal Blog API (FLASK)</h1>
+        </header>
+    </div>
+    
+
+    <div class="content">
+        <main class="hero">
+            <div class="intor">
+                <h3 class="hero1">Introduction</h3>
+            </div>
+
+            <div class="hero2">
+                <p class="para">
+                    Welcome, this Blog API contains 30 routes with the exeption of this route that displays this page.
+            I will show you all the routes with their given request methods and parameters if needed. Without further delay, let's delve in.
+                </p>
+            </div>
+
+            <div class="hero4">
+                <h3 class="use">How To Use</h3>
+
+                <p class="use-case">
+                    For experienced python and github users, you can clone the repository @ <a href="https://github.com/JohnStares/Personal-Blog-APi">Githib link</a>.
+                    <span class="note">Note: </span> You will have to make slight chances to the database_uri to be able to use sqlite3 for internal database storage,
+                    create your own .env file to store sensitive info like jwt secret_key, flask secret_key(s); BOOOOM!!! You know your way from there. <br>
+                    <br>
+                    For those without python background and may or maynot have an experience with github; you are the reason i made this welcome page.
+                    All you have to do is follow the information on the table below; any further question or issues, reach me via my email below or open and issue
+                    in my git repository <a href="https://github.com/JohnStares/Personal-Blog-APi">Git repo</a>. Thank you. <br>
+                    <br>
+                    <span class="important">All devops/users note: </span> At the end of the the base url, always add <span class="version">/v1</span>else you risk
+                    not accesing the site.
+                </p>
+            </div>
+
+            <div class="hero3">
+
+                <h3 class="notice fade-in"><span class="hero5">Note:</span>All routes requires you to be logged in. It uses JWT tokens for authentication and authorization. <br>
+                    All responses are strictly in JSON.
+                </h3>
+
+
+                <table class="tab">
+                    <tr class="row fade-in">
+                        <th>Route</th>
+                        <th>Method</th>
+                        <th>Paramters</th>
+                        <th>Usage/Description</th>
+                    </tr>
+
+                    <tr class="data">
+                        <td>https://www.johnstares.pythonanywhere.com/v1</td>
+                        <td>GET</td>
+                        <td>None</td>
+                        <td>BASE URL <br> 
+                            Notice the /v1 at the end of the .com? it is required to access this site else you get page not found. The v1 stands for the version of the blog. <br>
+                            Any other routes falls behind the base url eg. https://www.johnstares.pythonanywhere.com/v1/blogs <br>
+
+                            This page you are on, is the BASE URL.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/register</td>
+                        <td>POST</td>
+                        <td>None</td>
+                        <td>To add a user to the blog. <br>
+                            This route content-type is multipart/form-data just incase the user wants to add a profile image during registration. <br>
+                            eg. key=data value={"username": "John Stares", "email": "johnstares@gmail.com", "password": "yourpassword"} <br>
+                            alongside an image eg. key=image value=name of image.PNG
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/login</td>
+                        <td>POST</td>
+                        <td>None</td>
+                        <td>This route content-type is application/json <br> 
+                            {
+                                "username": "John Stares",
+                                "password": "yourpassword"
+                            }
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/blogs</td>
+                        <td>POST</td>
+                        <td>None</td>
+                        <td>To make a blog post. content-type is multipart/from-data <br>
+                                key is data, value is title, content, category, tag, image_name; <br>
+                                key is image for attachment of images together with the blog. <br>
+
+                                eg. key=data, value={"title": "The legend king", "content": "your blog content": "category": "Folk-Tale", "tag": ["epic", "king", "legendary"], "image_name": "picture of the king being celebrated."} <br>
+                                alongside the image key=image value=name of pciture.PNG
+                            </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/blogs</td>
+                        <td>GET</td>
+                        <td>None</td>
+                        <td>To fetch all post. This routes brings all post from the database if working directly with this site. post made and not deleted by other users including yours
+                            will be shown here.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/delete-blog</td>
+                        <td>DELETE</td>
+                        <td>/1</td>
+                        <td>Use to delete a blog. <br>
+                            The parameter /1 is the blog ID.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/delete-tag</td>
+                        <td>DELETE</td>
+                        <td>/1</td>
+                        <td>Use to delete a tag. <br>
+                            The parameter /1 is the tag ID.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/view-users</td>
+                        <td>GET</td>
+                        <td>None</td>
+                        <td>To get all the users in the database. <br>
+                            Doesn't require you to be logged in but it uses a rate-limiter and only 3 request per day.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/add-comment</td>
+                        <td>POST</td>
+                        <td>/1</td>
+                        <td>To add a comment to a blog. <br>
+                            The /1 is the ID of the blog you want the comment to go to. <br>
+                            content-type is application/json <br>
+                            {
+                                "content": "your comment".
+                            }
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/view-comment</td>
+                        <td>GET</td>
+                        <td>None</td>
+                        <td>To get all the comments on every blog made not only by you.</td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>delete-comment</td>
+                        <td>DELETE</td>
+                        <td>/1</td>
+                        <td>To delete a comment <br>
+                            The /1 is the ID of the comment you want to delete.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/reply-comment</td>
+                        <td>POST</td>
+                        <td>/1/1</td>
+                        <td>To reply a comment <br>
+                            The first /1 is the comment ID and the second /1 is the blog ID. <br>
+                            content-type is application/json <br>
+                            {
+                                "reply": "your reply"
+                            }
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/reply-reply</td>
+                        <td>POST</td>
+                        <td>/1/1/1</td>
+                        <td>To reply a reply. <br>
+                            The first /1 is the comment ID, the second /1 is the blog ID and the third /1 is the reply ID. <br>
+                            content-type is application/json <br>
+                            {
+                                "reply": "your reply"
+                            }
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/delete-reply</td>
+                        <td>DELETE</td>
+                        <td>/1</td>
+                        <td>To delete a reply. <br>
+                            The /1 is the ID of the reply.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/view-reply</td>
+                        <td>GET</td>
+                        <td>None</td>
+                        <td>To get all replys made to a comment even those not made by you on your own blog.</td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/view-replies</td>
+                        <td>GET</td>
+                        <td>None</td>
+                        <td>To get all replies made to a reply made to a comment even those not made by you on youw blog.</td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/like/blog/id</td>
+                        <td>POST</td>
+                        <td>/1</td>
+                        <td>To make a like to a blog. <br>
+                            The /1 is the ID of the blog you want to like.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/like/comment/id</td>
+                        <td>POST</td>
+                        <td>/1</td>
+                        <td>To make a like a comment. <br>
+                            The /1 is the ID of the comment you want to like.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/like/reply/id</td>
+                        <td>POST</td>
+                        <td>/1</td>
+                        <td>To make a like to a reply. <br>
+                            The /1 is the ID of the reply you want to like.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/delete-likes/id</td>
+                        <td>DELETE</td>
+                        <td>/1</td>
+                        <td>Use to unlike a blog or a comment or a reply.</td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/search</td>
+                        <td>GET</td>
+                        <td>None</td>
+                        <td>To search for a blog either by author, category, tag, title or date. <br>
+                            It uses a search parameter (a for author, c for category, q for title, p for date and t for tag). <br>
+                            You can make a specific search using author, category and title at the same time. <br>
+                            Doesn't require you to sign in but uses a rate-limiter of 3 request per minute.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/serve-images/filename</td>
+                        <td>GET</td>
+                        <td>/filename</td>
+                        <td>A route that works behind the scene in ensuring profile pictures and blog images are delivered.</td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>user-profile/1</td>
+                        <td>GET</td>
+                        <td>/1  (optional)</td>
+                        <td>To get details and blogs post made by a user. <br>
+                            If it carries a parameter /1 it means you are searching for another users profile but if it doesn't it means, you are entering your own profile.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/search-author</td>
+                        <td>GET</td>
+                        <td>None</td>
+                        <td>To search for a user. <br>
+                            This route uses a search parameter a and returns an ID of ther user if found; you will now user the ID on /user-profile/id.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/password-update</td>
+                        <td>PATCH</td>
+                        <td>None</td>
+                        <td>To change password. <br>
+                            content-type is application/json <br>
+                            {
+                                "new password": "your new password" 
+                            }
+
+                            a rate-limiter is used to limit password update twice in a month.
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/username-update</td>
+                        <td>PATCH</td>
+                        <td>None</td>
+                        <td>To change password. <br>
+                            content-type is application/json <br>
+                            {
+                                "username": "your new username"
+                            }
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/update-profile-pic</td>
+                        <td>PATCH</td>
+                        <td>None</td>
+                        <td>To update profile picture. <br>
+                            content-type is multipart/form-data. <br>
+                            key=image value=profilepic.PNG
+                        </td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/delete-account</td>
+                        <td>DELETE</td>
+                        <td>None</td>
+                        <td>To delete ones account. Best to be done after testing.</td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/follow/id</td>
+                        <td>POST</td>
+                        <td>/id</td>
+                        <td>To follow a user</td>
+                    </tr>
+
+                    <tr class="data">
+                        <td>/logout</td>
+                        <td>POST</td>
+                        <td>None</td>
+                        <td>To logout of ones account.</td>
+                    </tr>
+
+
+                </table>
+            </div>
+
+            <div class="appreciation">
+                <p>I thank you all developers and general users for using this API as a means for testing, developing and harnessing your frontend skill or any other skill in general;
+                    if there is any issue u faced while using the API, please feel free to contact me from my gmail below or go to my github and open an issue @ <a href="https://github.com/JohnStares/Personal-Blog-APi">Github link</a>
+
+                </p>
+            </div>
+        </main>
+    </div>
+    
+    <div class="footer">
+        <footer class="foot">
+            <hr>
+            <div class="author">
+                <h6><span class="name">Author: </span>Pythonista. John Stares</h6>
+            </div>
+
+            <div class="copy-right">
+                <h6>Copyright reserved&copy;</h6>
+            </div>
+
+            <div class="contact">
+                <h6><small><a href="mailto:wisdom8achor24@gmail.com">Send an email to : wisdom8achor24@gmail.com</a></small></h6>
+            </div>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
